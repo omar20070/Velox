@@ -55,6 +55,11 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
+
+      - name: Build release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -62,9 +67,17 @@ jobs:
           name: android-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apk
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          files: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
