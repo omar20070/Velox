@@ -50,6 +50,24 @@ function getDomain(url: string): string {
   }
 }
 
+function isLikelyFrameBlocked(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    const blockedDomains = [
+      'google.com',
+      'reddit.com',
+      'facebook.com',
+      'instagram.com',
+      'x.com',
+      'twitter.com',
+      'tiktok.com',
+    ];
+    return blockedDomains.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
+  } catch {
+    return false;
+  }
+}
+
 export function BrowserScreen() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,6 +76,7 @@ export function BrowserScreen() {
   const [currentUrl, setCurrentUrl] = useState(searchParams.get('url') || DEFAULT_URL);
   const [urlInput, setUrlInput] = useState(currentUrl);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFrameBlocked, setIsFrameBlocked] = useState(isLikelyFrameBlocked(currentUrl));
   
   // History management
   const [history, setHistory] = useState<HistoryItem[]>([{ url: DEFAULT_URL, title: 'Google' }]);
@@ -85,6 +104,7 @@ export function BrowserScreen() {
     if (url && url !== currentUrl) {
       setCurrentUrl(url);
       setUrlInput(url);
+      setIsFrameBlocked(isLikelyFrameBlocked(url));
     }
   }, [searchParams]);
 
@@ -110,6 +130,7 @@ export function BrowserScreen() {
     setCurrentUrl(normalizedUrl);
     setUrlInput(normalizedUrl);
     setIsLoading(true);
+    setIsFrameBlocked(isLikelyFrameBlocked(normalizedUrl));
     addToHistory(normalizedUrl);
     
     // Update search params to trigger navigation
@@ -130,6 +151,7 @@ export function BrowserScreen() {
       setHistoryIndex(historyIndex - 1);
       setCurrentUrl(prev.url);
       setUrlInput(prev.url);
+      setIsFrameBlocked(isLikelyFrameBlocked(prev.url));
       setSearchParams({ url: prev.url });
       
       setTabs(tabs.map(t => 
@@ -146,6 +168,7 @@ export function BrowserScreen() {
       setHistoryIndex(historyIndex + 1);
       setCurrentUrl(next.url);
       setUrlInput(next.url);
+      setIsFrameBlocked(isLikelyFrameBlocked(next.url));
       setSearchParams({ url: next.url });
       
       setTabs(tabs.map(t => 
@@ -185,6 +208,7 @@ export function BrowserScreen() {
     setActiveTabId(newTab.id);
     setCurrentUrl(DEFAULT_URL);
     setUrlInput(DEFAULT_URL);
+    setIsFrameBlocked(isLikelyFrameBlocked(DEFAULT_URL));
     setHistory([{ url: DEFAULT_URL, title: 'Google' }]);
     setHistoryIndex(0);
     setSearchParams({ url: DEFAULT_URL });
@@ -202,6 +226,7 @@ export function BrowserScreen() {
       setActiveTabId(newActiveTab.id);
       setCurrentUrl(newActiveTab.url);
       setUrlInput(newActiveTab.url);
+      setIsFrameBlocked(isLikelyFrameBlocked(newActiveTab.url));
       setSearchParams({ url: newActiveTab.url });
     }
   };
@@ -212,8 +237,13 @@ export function BrowserScreen() {
       setActiveTabId(tabId);
       setCurrentUrl(tab.url);
       setUrlInput(tab.url);
+      setIsFrameBlocked(isLikelyFrameBlocked(tab.url));
       setSearchParams({ url: tab.url });
     }
+  };
+
+  const openCurrentUrlExternally = () => {
+    window.open(currentUrl, '_blank', 'noopener,noreferrer');
   };
 
   const canGoBack = historyIndex > 0;
@@ -424,11 +454,32 @@ export function BrowserScreen() {
 
       {/* Main content - Full page */}
       <main className="flex-1">
-        <iframe
-          src={currentUrl}
-          className="w-full h-[calc(100vh-3.5rem)] border-none bg-white"
-          title={activeTab?.title || 'Browser'}
-        />
+        {isFrameBlocked ? (
+          <div className="w-full h-[calc(100vh-3.5rem)] flex items-center justify-center bg-[#111827] px-6">
+            <div className="max-w-xl text-center space-y-4">
+              <h2 className="text-2xl font-bold">Page non disponible dans l&apos;application</h2>
+              <p className="text-gray-300">
+                Ce site bloque l&apos;affichage dans une iframe (erreur navigateur:
+                {' '}<span className="font-mono">net::ERR_BLOCKED_BY_RESPONSE</span>).
+              </p>
+              <p className="text-gray-400 text-sm">
+                URL: <span className="font-mono break-all">{currentUrl}</span>
+              </p>
+              <button
+                onClick={openCurrentUrlExternally}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors"
+              >
+                Ouvrir dans un nouvel onglet
+              </button>
+            </div>
+          </div>
+        ) : (
+          <iframe
+            src={currentUrl}
+            className="w-full h-[calc(100vh-3.5rem)] border-none bg-white"
+            title={activeTab?.title || 'Browser'}
+          />
+        )}
       </main>
     </div>
   );
